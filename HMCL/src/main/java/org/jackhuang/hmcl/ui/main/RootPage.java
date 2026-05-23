@@ -227,6 +227,15 @@ public class RootPage extends DecoratorAnimatedPage implements DecoratorPage {
                 }
             });
 
+            // seventh item in left sidebar
+            AdvancedListItem ourmcItem = new AdvancedListItem();
+            ourmcItem.setLeftIcon(SVG.HOME);
+            ourmcItem.setTitle(i18n("settings.category.ourmc"));
+            ourmcItem.setOnAction(e -> {
+                Controllers.getSettingsPage().showOurmcSettings();
+                Controllers.navigate(Controllers.getSettingsPage());
+            });
+
             // the left sidebar
             AdvancedListBox sideBar = new AdvancedListBox()
                     .startCategory(i18n("account").toUpperCase(Locale.ROOT))
@@ -238,10 +247,13 @@ public class RootPage extends DecoratorAnimatedPage implements DecoratorPage {
                     .startCategory(i18n("settings.launcher.general").toUpperCase(Locale.ROOT))
                     .add(launcherSettingsItem)
                     .add(terracottaItem)
+                    .add(ourmcItem);
+                    /*
                     .addNavigationDrawerItem(i18n("contact.chat"), SVG.CHAT, () -> {
                         Controllers.getSettingsPage().showFeedback();
                         Controllers.navigate(Controllers.getSettingsPage());
                     });
+                    */
 
             // the root page, with the sidebar in left, navigator in center.
             setLeft(sideBar);

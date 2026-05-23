@@ -263,7 +263,31 @@ public final class SettingsPage extends ScrollPane {
 
                 rootPane.getChildren().addAll(ComponentList.createComponentListTitle(i18n("settings.launcher.misc")), miscPaneList);
             }
+
+            {
+                ComponentList ourmcPaneList = new ComponentList();
+
+                {
+                    LineButton websiteButton = LineButton.createNavigationButton();
+                    websiteButton.setTitle(i18n("ourmc.website"));
+                    websiteButton.setOnAction(e -> FXUtils.openLink("https://www.our-mc.cn/"));
+                    ourmcPaneList.getContent().add(websiteButton);
+                }
+
+                {
+                    LineButton skinSiteButton = LineButton.createNavigationButton();
+                    skinSiteButton.setTitle(i18n("ourmc.skin_site"));
+                    skinSiteButton.setOnAction(e -> FXUtils.openLink("https://skin.our-mc.cn/"));
+                    ourmcPaneList.getContent().add(skinSiteButton);
+                }
+
+                rootPane.getChildren().addAll(ComponentList.createComponentListTitle(i18n("settings.category.ourmc")), ourmcPaneList);
+            }
         }
+    }
+
+    public void showOurmcSettings() {
+        // This method can be used to scroll to or highlight the ourmc section if needed
     }
 
     private void openLogFolder() {

@@ -209,6 +209,23 @@ public final class MainPage extends StackPane implements DecoratorPage {
 
         StackPane.setAlignment(launchPane, Pos.BOTTOM_RIGHT);
         {
+            JFXButton lobbyButton = new JFXButton();
+            lobbyButton.getStyleClass().add("launch-button");
+            {
+                VBox graphic = new VBox();
+                graphic.setAlignment(Pos.CENTER);
+                Label lobbyLabel = new Label(i18n("button.enter_lobby"));
+                lobbyLabel.setStyle("-fx-font-size: 16px;");
+                graphic.getChildren().setAll(lobbyLabel);
+                lobbyButton.setGraphic(graphic);
+            }
+            FXUtils.setOnActionWithCooldown(lobbyButton, () -> {
+                Profile profile = Profiles.getSelectedProfile();
+                Versions.launch(profile, "1.21.8", launcherHelper -> {
+                    launcherHelper.setQuickPlayOption(new org.jackhuang.hmcl.game.QuickPlayOption.MultiPlayer("mc.our-mc.cn"));
+                });
+            });
+
             JFXButton launchButton = new JFXButton();
             launchButton.getStyleClass().add("launch-button");
             launchButton.setDefaultButton(true);
@@ -269,7 +286,7 @@ public final class MainPage extends StackPane implements DecoratorPage {
             launchButton.addEventHandler(MouseEvent.MOUSE_CLICKED, secondaryClickHandle);
             menuButton.addEventHandler(MouseEvent.MOUSE_CLICKED, secondaryClickHandle);
 
-            launchPane.getChildren().setAll(launchButton, menuButton);
+            launchPane.getChildren().setAll(lobbyButton, launchButton, menuButton);
         }
 
         getChildren().addAll(updatePane, launchPane);

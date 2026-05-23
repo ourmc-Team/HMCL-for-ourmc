@@ -119,37 +119,8 @@ public final class ConfigHolder {
     }
 
     private static Path locateConfig() {
-        Path defaultConfigFile = Metadata.HMCL_CURRENT_DIRECTORY.resolve(CONFIG_FILENAME);
-        if (Files.isRegularFile(defaultConfigFile))
-            return defaultConfigFile;
-
-        try {
-            Path jarPath = JarUtils.thisJarPath();
-            if (jarPath != null && Files.isRegularFile(jarPath) && Files.isWritable(jarPath)) {
-                jarPath = jarPath.getParent();
-
-                Path config = jarPath.resolve(CONFIG_FILENAME);
-                if (Files.isRegularFile(config))
-                    return config;
-
-                Path dotConfig = jarPath.resolve(CONFIG_FILENAME_LINUX);
-                if (Files.isRegularFile(dotConfig))
-                    return dotConfig;
-            }
-
-        } catch (Throwable ignore) {
-        }
-
-        Path config = Paths.get(CONFIG_FILENAME);
-        if (Files.isRegularFile(config))
-            return config;
-
-        Path dotConfig = Paths.get(CONFIG_FILENAME_LINUX);
-        if (Files.isRegularFile(dotConfig))
-            return dotConfig;
-
-        // create new
-        return defaultConfigFile;
+        // Force configuration to be stored in the current directory
+        return Metadata.HMCL_CURRENT_DIRECTORY.resolve(CONFIG_FILENAME);
     }
 
     private static Config loadConfig() throws IOException {

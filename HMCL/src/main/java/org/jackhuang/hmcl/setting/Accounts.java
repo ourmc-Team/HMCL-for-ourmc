@@ -71,19 +71,16 @@ public final class Accounts {
 
     public static final OAuthServer.Factory OAUTH_CALLBACK = new OAuthServer.Factory();
 
-    public static final OfflineAccountFactory FACTORY_OFFLINE = new OfflineAccountFactory(AUTHLIB_INJECTOR_DOWNLOADER);
-    public static final AuthlibInjectorAccountFactory FACTORY_AUTHLIB_INJECTOR = new AuthlibInjectorAccountFactory(AUTHLIB_INJECTOR_DOWNLOADER, Accounts::getOrCreateAuthlibInjectorServer);
-    public static final MicrosoftAccountFactory FACTORY_MICROSOFT = new MicrosoftAccountFactory(new MicrosoftService(OAUTH_CALLBACK));
-    public static final List<AccountFactory<?>> FACTORIES = immutableListOf(FACTORY_OFFLINE, FACTORY_MICROSOFT, FACTORY_AUTHLIB_INJECTOR);
+    public static final AuthlibInjectorServer OURMC_SERVER = new AuthlibInjectorServer("https://skin.our-mc.cn/api/yggdrasil");
+    public static final BoundAuthlibInjectorAccountFactory FACTORY_OURMC = new BoundAuthlibInjectorAccountFactory(AUTHLIB_INJECTOR_DOWNLOADER, OURMC_SERVER);
+    public static final List<AccountFactory<?>> FACTORIES = immutableListOf(FACTORY_OURMC);
 
     // ==== login type / account factory mapping ====
     private static final Map<String, AccountFactory<?>> type2factory = new HashMap<>();
     private static final Map<AccountFactory<?>, String> factory2type = new HashMap<>();
 
     static {
-        type2factory.put("offline", FACTORY_OFFLINE);
-        type2factory.put("authlibInjector", FACTORY_AUTHLIB_INJECTOR);
-        type2factory.put("microsoft", FACTORY_MICROSOFT);
+        type2factory.put("authlibInjector", FACTORY_OURMC);
 
         type2factory.forEach((type, factory) -> factory2type.put(factory, type));
     }
@@ -110,12 +107,8 @@ public final class Accounts {
     // ====
 
     public static AccountFactory<?> getAccountFactory(Account account) {
-        if (account instanceof OfflineAccount)
-            return FACTORY_OFFLINE;
-        else if (account instanceof AuthlibInjectorAccount)
-            return FACTORY_AUTHLIB_INJECTOR;
-        else if (account instanceof MicrosoftAccount)
-            return FACTORY_MICROSOFT;
+        if (account instanceof AuthlibInjectorAccount)
+            return FACTORY_OURMC;
         else
             throw new IllegalArgumentException("Failed to determine account type: " + account);
     }
@@ -197,14 +190,9 @@ public final class Accounts {
         if (initialized)
             throw new IllegalStateException("Already initialized");
 
-        if (!config().isAddedLittleSkin()) {
-            AuthlibInjectorServer littleSkin = new AuthlibInjectorServer("https://littleskin.cn/api/yggdrasil/");
-
-            if (config().getAuthlibInjectorServers().stream().noneMatch(it -> littleSkin.getUrl().equals(it.getUrl()))) {
-                config().getAuthlibInjectorServers().add(0, littleSkin);
-            }
-
-            config().setAddedLittleSkin(true);
+        // Ensure Ourmc server is always present and at the top
+        if (!config().getAuthlibInjectorServers().contains(OURMC_SERVER)) {
+            config().getAuthlibInjectorServers().add(0, OURMC_SERVER);
         }
 
         loadGlobalAccountStorages();
