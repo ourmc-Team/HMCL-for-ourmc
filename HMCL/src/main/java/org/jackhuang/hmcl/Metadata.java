@@ -65,20 +65,13 @@ public final class Metadata {
     public static final Path DEPENDENCIES_DIRECTORY;
 
     static {
+        // Force all data to be stored in the current directory to avoid conflicts with original HMCL
         String hmclHome = System.getProperty("hmcl.home", System.getenv("HMCL_USER_HOME"));
-        if (StringUtils.isBlank(hmclHome)) {
-            if (OperatingSystem.CURRENT_OS.isLinuxOrBSD()) {
-                String xdgData = System.getenv("XDG_DATA_HOME");
-                if (StringUtils.isNotBlank(xdgData)) {
-                    HMCL_GLOBAL_DIRECTORY = Path.of(xdgData, "hmcl").toAbsolutePath().normalize();
-                } else {
-                    HMCL_GLOBAL_DIRECTORY = Path.of(System.getProperty("user.home"), ".local", "share", "hmcl").toAbsolutePath().normalize();
-                }
-            } else {
-                HMCL_GLOBAL_DIRECTORY = OperatingSystem.getWorkingDirectory("hmcl");
-            }
-        } else {
+        if (StringUtils.isNotBlank(hmclHome)) {
             HMCL_GLOBAL_DIRECTORY = Path.of(hmclHome).toAbsolutePath().normalize();
+        } else {
+            // Use current directory's .hmcl folder instead of system global directory
+            HMCL_GLOBAL_DIRECTORY = CURRENT_DIRECTORY.resolve(".hmcl");
         }
 
         String hmclCurrentDir = System.getProperty("hmcl.dir", System.getenv("HMCL_LOCAL_HOME"));

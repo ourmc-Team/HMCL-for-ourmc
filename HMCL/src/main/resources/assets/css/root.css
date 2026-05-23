@@ -434,8 +434,8 @@
 .launch-pane {
     -fx-max-height: 57px;
     -fx-min-height: 57px;
-    -fx-max-width: 230px;
-    -fx-min-width: 230px;
+    -fx-max-width: 350px;
+    -fx-min-width: 350px;
 }
 
 .launch-pane > .jfx-button {
@@ -448,8 +448,8 @@
 }
 
 .launch-pane > .jfx-button.launch-button {
-    -fx-max-width: 207px;
-    -fx-min-width: 207px;
+    -fx-max-width: 145px;
+    -fx-min-width: 145px;
     -fx-border-width: 0 3px 0 0;
     -fx-border-color: -monet-on-surface-variant;
     -fx-background-radius: 4px 0 0 4px;

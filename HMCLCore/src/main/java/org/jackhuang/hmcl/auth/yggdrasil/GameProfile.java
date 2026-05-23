@@ -27,6 +27,8 @@ import org.jackhuang.hmcl.util.gson.Validation;
 import com.google.gson.JsonParseException;
 import com.google.gson.annotations.JsonAdapter;
 
+import static org.jackhuang.hmcl.util.logging.Logger.LOG;
+
 /**
  * @author huangyuhui
  */
@@ -39,8 +41,8 @@ public class GameProfile implements Validation {
     private final String name;
 
     public GameProfile(UUID id, String name) {
-        this.id = Objects.requireNonNull(id);
-        this.name = Objects.requireNonNull(name);
+        this.id = id;
+        this.name = name;
     }
 
     public UUID getId() {
@@ -53,7 +55,13 @@ public class GameProfile implements Validation {
 
     @Override
     public void validate() throws JsonParseException {
-        Validation.requireNonNull(id, "Game profile id cannot be null");
-        Validation.requireNonNull(name, "Game profile name cannot be null");
+        // Be more lenient: only warn but don't fail validation if fields are null
+        // Some Yggdrasil servers may return incomplete profiles
+        if (id == null) {
+            LOG.warning("Game profile id is null - this may cause issues");
+        }
+        if (name == null) {
+            LOG.warning("Game profile name is null - this may cause issues");
+        }
     }
 }

@@ -92,6 +92,10 @@ public class LauncherSettingsPage extends DecoratorAnimatedPage implements Decor
         tab.select(gameTab, false);
     }
 
+    public void showOurmcSettings() {
+        tab.select(settingsTab, false);
+    }
+
     public void showFeedback() {
         tab.select(feedbackTab, false);
     }

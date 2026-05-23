@@ -43,6 +43,7 @@ import org.jackhuang.hmcl.setting.Accounts;
 import org.jackhuang.hmcl.task.Schedulers;
 import org.jackhuang.hmcl.task.Task;
 import org.jackhuang.hmcl.task.TaskExecutor;
+import org.jackhuang.hmcl.task.Task.FinalizedCallbackWithResult;
 import org.jackhuang.hmcl.theme.Themes;
 import org.jackhuang.hmcl.ui.FXUtils;
 import org.jackhuang.hmcl.ui.WeakListenerHolder;
@@ -164,7 +165,7 @@ public class MicrosoftAccountLoginPane extends JFXDialogLayout implements Dialog
             rootContainer.getChildren().add(new JFXSpinner());
 
             browserTaskExecutor = Task.supplyAsync(() -> Accounts.FACTORY_MICROSOFT.create(null, null, null, null, OAuth.GrantFlow.AUTHORIZATION_CODE))
-                    .whenComplete(Schedulers.javafx(), this::onLoginCompleted)
+                    .whenComplete(Schedulers.javafx(), (FinalizedCallbackWithResult<MicrosoftAccount>) this::onLoginCompleted)
                     .executor(true);
         } else if (currentStep instanceof Step.StartDeviceCodeLogin) {
             loginButtonSpinner.setLoading(true);
@@ -173,7 +174,7 @@ public class MicrosoftAccountLoginPane extends JFXDialogLayout implements Dialog
             rootContainer.getChildren().add(new JFXSpinner());
 
             deviceTaskExecutor = Task.supplyAsync(() -> Accounts.FACTORY_MICROSOFT.create(null, null, null, null, OAuth.GrantFlow.DEVICE))
-                    .whenComplete(Schedulers.javafx(), this::onLoginCompleted)
+                    .whenComplete(Schedulers.javafx(), (FinalizedCallbackWithResult<MicrosoftAccount>) this::onLoginCompleted)
                     .executor(true);
         } else if (currentStep instanceof Step.WaitForOpenBrowser wait) {
             btnLogin.setOnAction(e -> {

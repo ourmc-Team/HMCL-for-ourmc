@@ -73,7 +73,14 @@ public final class Accounts {
 
     public static final AuthlibInjectorServer OURMC_SERVER = new AuthlibInjectorServer("https://skin.our-mc.cn/api/yggdrasil");
     public static final BoundAuthlibInjectorAccountFactory FACTORY_OURMC = new BoundAuthlibInjectorAccountFactory(AUTHLIB_INJECTOR_DOWNLOADER, OURMC_SERVER);
-    public static final List<AccountFactory<?>> FACTORIES = immutableListOf(FACTORY_OURMC);
+    
+    // Define other account factories
+    public static final OfflineAccountFactory FACTORY_OFFLINE = new OfflineAccountFactory(AUTHLIB_INJECTOR_DOWNLOADER);
+    public static final MicrosoftService MICROSOFT_SERVICE = new MicrosoftService(OAUTH_CALLBACK);
+    public static final MicrosoftAccountFactory FACTORY_MICROSOFT = new MicrosoftAccountFactory(MICROSOFT_SERVICE);
+    public static final AuthlibInjectorAccountFactory FACTORY_AUTHLIB_INJECTOR = new AuthlibInjectorAccountFactory(AUTHLIB_INJECTOR_DOWNLOADER, url -> new AuthlibInjectorServer(url));
+    
+    public static final List<AccountFactory<?>> FACTORIES = immutableListOf(FACTORY_OURMC, FACTORY_OFFLINE, FACTORY_MICROSOFT, FACTORY_AUTHLIB_INJECTOR);
 
     // ==== login type / account factory mapping ====
     private static final Map<String, AccountFactory<?>> type2factory = new HashMap<>();
@@ -81,6 +88,9 @@ public final class Accounts {
 
     static {
         type2factory.put("authlibInjector", FACTORY_OURMC);
+        type2factory.put("offline", FACTORY_OFFLINE);
+        type2factory.put("microsoft", FACTORY_MICROSOFT);
+        type2factory.put("authlib-injector", FACTORY_AUTHLIB_INJECTOR);
 
         type2factory.forEach((type, factory) -> factory2type.put(factory, type));
     }
@@ -387,6 +397,7 @@ public final class Accounts {
 
     // ==== Login type name i18n ===
     private static final Map<AccountFactory<?>, String> unlocalizedLoginTypeNames = mapOf(
+            pair(Accounts.FACTORY_OURMC, "account.methods.ourmc"),
             pair(Accounts.FACTORY_OFFLINE, "account.methods.offline"),
             pair(Accounts.FACTORY_AUTHLIB_INJECTOR, "account.methods.authlib_injector"),
             pair(Accounts.FACTORY_MICROSOFT, "account.methods.microsoft"));

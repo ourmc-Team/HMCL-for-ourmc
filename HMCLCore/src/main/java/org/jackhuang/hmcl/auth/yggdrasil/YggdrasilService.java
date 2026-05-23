@@ -20,6 +20,7 @@ package org.jackhuang.hmcl.auth.yggdrasil;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
+import com.google.gson.annotations.SerializedName;
 import org.jackhuang.hmcl.auth.AuthenticationException;
 import org.jackhuang.hmcl.auth.ServerDisconnectException;
 import org.jackhuang.hmcl.auth.ServerResponseMalformedException;
@@ -28,6 +29,7 @@ import org.jackhuang.hmcl.util.gson.UUIDTypeAdapter;
 import org.jackhuang.hmcl.util.gson.ValidationTypeAdapterFactory;
 import org.jackhuang.hmcl.util.io.FileUtils;
 import org.jackhuang.hmcl.util.io.HttpMultipartRequest;
+import org.jackhuang.hmcl.util.io.IOUtils;
 import org.jackhuang.hmcl.util.io.NetworkUtils;
 import org.jackhuang.hmcl.util.javafx.ObservableOptionalCache;
 
@@ -200,11 +202,46 @@ public class YggdrasilService {
     }
 
     private static YggdrasilSession handleAuthenticationResponse(String responseText, String clientToken) throws AuthenticationException {
-        AuthenticationResponse response = fromJson(responseText, AuthenticationResponse.class);
+        LOG.info("Handling authentication response...");
+        
+        AuthenticationResponse response;
+        try {
+            response = fromJson(responseText, AuthenticationResponse.class);
+        } catch (ServerResponseMalformedException e) {
+            LOG.warning("Failed to parse authentication response: " + responseText);
+            throw e;
+        }
+        
+        // Log the parsed response fields for debugging
+        LOG.info("Parsed response - error: " + response.error + ", errorMessage: " + response.errorMessage);
+        LOG.info("Parsed response - accessToken: " + (response.accessToken != null ? "[PRESENT]" : "[NULL]"));
+        LOG.info("Parsed response - clientToken: " + (response.clientToken != null ? "[PRESENT]" : "[NULL]"));
+        LOG.info("Parsed response - selectedProfile: " + (response.selectedProfile != null ? "[PRESENT]" : "[NULL]"));
+        LOG.info("Parsed response - availableProfiles: " + (response.availableProfiles != null ? "[PRESENT, count=" + response.availableProfiles.size() + "]" : "[NULL]"));
+        LOG.info("Parsed response - user: " + (response.user != null ? "[PRESENT]" : "[NULL]"));
+        
         handleErrorMessage(response);
 
-        if (!clientToken.equals(response.clientToken))
+        if (response.clientToken == null) {
+            LOG.warning("Missing clientToken in response");
+            throw new ServerResponseMalformedException("Missing clientToken in response");
+        }
+        
+        if (!clientToken.equals(response.clientToken)) {
+            LOG.warning("Client token mismatch: expected " + clientToken + ", got " + response.clientToken);
             throw new AuthenticationException("Client token changed from " + clientToken + " to " + response.clientToken);
+        }
+
+        if (response.accessToken == null) {
+            LOG.warning("Missing accessToken in response");
+            throw new ServerResponseMalformedException("Missing accessToken in response");
+        }
+
+        if (response.selectedProfile == null) {
+            LOG.warning("Missing selectedProfile in response - this may be acceptable for some servers");
+        } else {
+            LOG.info("Selected profile - id: " + response.selectedProfile.getId() + ", name: " + response.selectedProfile.getName());
+        }
 
         return new YggdrasilSession(
                 response.clientToken,
@@ -228,21 +265,85 @@ public class YggdrasilService {
     }
 
     private static String request(URI uri, Object payload) throws AuthenticationException {
+        HttpURLConnection con = null;
         try {
-            if (payload == null)
-                return NetworkUtils.doGet(uri);
-            else
-                return NetworkUtils.doPost(uri, payload instanceof String ? (String) payload : GSON.toJson(payload), "application/json");
+            String result;
+            if (payload == null) {
+                LOG.info("Sending GET request to: " + uri);
+                con = NetworkUtils.createHttpConnection(uri);
+                con.setRequestMethod("GET");
+                result = NetworkUtils.readFullyAsString(con);
+            } else {
+                String jsonPayload = payload instanceof String ? (String) payload : GSON.toJson(payload);
+                LOG.info("Sending POST request to: " + uri);
+                LOG.info("Request payload: " + jsonPayload);
+                
+                con = NetworkUtils.createHttpConnection(uri);
+                con.setRequestMethod("POST");
+                con.setDoOutput(true);
+                con.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                byte[] bytes = jsonPayload.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                con.setRequestProperty("Content-Length", String.valueOf(bytes.length));
+                try (java.io.OutputStream os = con.getOutputStream()) {
+                    os.write(bytes);
+                }
+                
+                // Check HTTP status code
+                int responseCode = con.getResponseCode();
+                LOG.info("HTTP response code: " + responseCode);
+                
+                if (responseCode >= 400) {
+                    LOG.warning("HTTP error response code: " + responseCode + " for " + uri);
+                    // Try to read error message from error stream
+                    String errorResponse;
+                    try (InputStream stderr = con.getErrorStream()) {
+                        if (stderr != null) {
+                            errorResponse = IOUtils.readFullyAsString(stderr, java.nio.charset.StandardCharsets.UTF_8);
+                            LOG.warning("Error response body: " + errorResponse);
+                        } else {
+                            errorResponse = "No error body";
+                        }
+                    }
+                    throw new RemoteAuthenticationException(
+                        "HTTP_" + responseCode,
+                        "HTTP error: " + responseCode + " - " + errorResponse,
+                        null
+                    );
+                }
+                
+                result = NetworkUtils.readFullyAsString(con);
+            }
+            LOG.info("Response from " + uri + ": " + (result != null ? result.substring(0, Math.min(500, result.length())) : "null"));
+            return result;
+        } catch (RemoteAuthenticationException e) {
+            // Re-throw remote authentication exceptions as-is
+            throw e;
         } catch (IOException e) {
+            LOG.warning("Network error when requesting " + uri + ": " + e.getMessage(), e);
             throw new ServerDisconnectException(e);
+        } finally {
+            if (con != null) {
+                con.disconnect();
+            }
         }
     }
 
     private static <T> T fromJson(String text, Class<T> typeOfT) throws ServerResponseMalformedException {
+        if (text == null || text.isEmpty()) {
+            LOG.warning("Empty response received");
+            throw new ServerResponseMalformedException("Empty response from server");
+        }
+        
+        LOG.info("Parsing JSON response (length: " + text.length() + "): " + text.substring(0, Math.min(1000, text.length())));
+        
         try {
-            return GSON.fromJson(text, typeOfT);
+            T result = GSON.fromJson(text, typeOfT);
+            LOG.info("JSON parsing successful");
+            return result;
         } catch (JsonParseException e) {
-            throw new ServerResponseMalformedException(text, e);
+            LOG.warning("Failed to parse JSON response: " + text, e);
+            LOG.warning("JSON parse error details: " + e.getMessage());
+            throw new ServerResponseMalformedException(e);
         }
     }
 
@@ -251,10 +352,19 @@ public class YggdrasilService {
     }
 
     private final static class AuthenticationResponse extends ErrorResponse {
+        @SerializedName("accessToken")
         public String accessToken;
+        
+        @SerializedName("clientToken")
         public String clientToken;
+        
+        @SerializedName("selectedProfile")
         public GameProfile selectedProfile;
+        
+        @SerializedName("availableProfiles")
         public List<GameProfile> availableProfiles;
+        
+        @SerializedName("user")
         public User user;
     }
 
@@ -267,6 +377,7 @@ public class YggdrasilService {
     private static final Gson GSON = new GsonBuilder()
             .registerTypeAdapter(UUID.class, UUIDTypeAdapter.INSTANCE)
             .registerTypeAdapterFactory(ValidationTypeAdapterFactory.INSTANCE)
+            .serializeNulls()  // Allow null values
             .create();
 
     public static final String PURCHASE_URL = "https://www.xbox.com/games/store/minecraft-java-bedrock-edition-for-pc/9nxp44l49shj";

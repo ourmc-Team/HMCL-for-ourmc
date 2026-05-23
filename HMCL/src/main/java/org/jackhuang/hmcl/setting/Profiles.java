@@ -101,9 +101,9 @@ public final class Profiles {
 
     private static void checkProfiles() {
         if (profiles.isEmpty()) {
+            // Force configuration to use current directory only, disable auto-detection of system .minecraft
             Profile current = new Profile(Profiles.DEFAULT_PROFILE, Path.of(".minecraft"), new VersionSetting(), null, true);
-            Profile home = new Profile(Profiles.HOME_PROFILE, Metadata.MINECRAFT_DIRECTORY);
-            Platform.runLater(() -> profiles.addAll(current, home));
+            Platform.runLater(() -> profiles.add(current));
         }
     }
 
