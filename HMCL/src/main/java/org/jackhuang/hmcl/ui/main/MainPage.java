@@ -44,12 +44,16 @@ import org.jackhuang.hmcl.Metadata;
 import org.jackhuang.hmcl.download.DefaultDependencyManager;
 import org.jackhuang.hmcl.download.DownloadProvider;
 import org.jackhuang.hmcl.download.VersionList;
+import org.jackhuang.hmcl.game.ModpackHelper;
 import org.jackhuang.hmcl.game.Version;
 import org.jackhuang.hmcl.setting.DownloadProviders;
 import org.jackhuang.hmcl.setting.Profile;
 import org.jackhuang.hmcl.setting.Profiles;
 import org.jackhuang.hmcl.task.Schedulers;
 import org.jackhuang.hmcl.task.Task;
+import org.jackhuang.hmcl.util.TaskCancellationAction;
+import org.jackhuang.hmcl.util.io.CompressingUtils;
+import org.jackhuang.hmcl.util.io.FileUtils;
 import org.jackhuang.hmcl.theme.Themes;
 import org.jackhuang.hmcl.ui.Controllers;
 import org.jackhuang.hmcl.ui.FXUtils;
@@ -67,6 +71,10 @@ import org.jackhuang.hmcl.upgrade.UpdateChecker;
 import org.jackhuang.hmcl.upgrade.UpdateHandler;
 import org.jackhuang.hmcl.util.*;
 import org.jackhuang.hmcl.util.i18n.I18n;
+import org.jackhuang.hmcl.util.StringUtils;
+import org.jackhuang.hmcl.util.StringUtils;
+import org.jackhuang.hmcl.util.StringUtils;
+import org.jackhuang.hmcl.util.StringUtils;
 import org.jackhuang.hmcl.util.javafx.BindingMapping;
 import org.jackhuang.hmcl.util.platform.OperatingSystem;
 import org.jackhuang.hmcl.util.platform.Platform;
@@ -219,12 +227,7 @@ public final class MainPage extends StackPane implements DecoratorPage {
                 graphic.getChildren().setAll(lobbyLabel);
                 lobbyButton.setGraphic(graphic);
             }
-            FXUtils.setOnActionWithCooldown(lobbyButton, () -> {
-                Profile profile = Profiles.getSelectedProfile();
-                Versions.launch(profile, "1.21.8", launcherHelper -> {
-                    launcherHelper.setQuickPlayOption(new org.jackhuang.hmcl.game.QuickPlayOption.MultiPlayer("mc.our-mc.cn"));
-                });
-            });
+            FXUtils.setOnActionWithCooldown(lobbyButton, this::enterLobby);
 
             JFXButton launchButton = new JFXButton();
             launchButton.getStyleClass().add("launch-button");
@@ -370,6 +373,86 @@ public final class MainPage extends StackPane implements DecoratorPage {
                     }
                 });
         Controllers.taskDialog(task, i18n("version.launch.empty.installing"), TaskCancellationAction.NORMAL);
+    }
+
+    private void enterLobby() {
+        // 整合包名称，用于检查是否已安装
+        String modpackName = "OurMC-Lobby";
+        String serverAddress = "mc.our-mc.cn";
+        
+        Profile profile = Profiles.getSelectedProfile();
+        
+        LOG.warning("=== MainPage === enterLobby() called, modpack: " + modpackName + ", server: " + serverAddress);
+        
+        // 检查整合包是否已安装
+        if (profile.getRepository().hasVersion(modpackName)) {
+            // 已安装，直接启动
+            LOG.warning("=== MainPage === Modpack already installed, launching directly");
+            Versions.launch(profile, modpackName, launcherHelper -> {
+                LOG.warning("=== MainPage === Setting quick play option for server: " + serverAddress);
+                launcherHelper.setServerAddress(serverAddress);
+            });
+        } else {
+            // 未安装，先安装整合包
+            LOG.warning("=== MainPage === Modpack not installed, starting installation");
+            installAndLaunchLobby(profile, modpackName, serverAddress);
+        }
+    }
+    
+    private void installAndLaunchLobby(Profile profile, String modpackName, String serverAddress) {
+        // 从内置资源读取整合包 (zip 格式)
+        java.io.InputStream inputStream = getClass().getResourceAsStream("/assets/modpack/ourmc-lobby.zip");
+        if (inputStream == null) {
+            Controllers.dialog(i18n("install.modpack.failed"), i18n("install.failed"), MessageDialogPane.MessageType.ERROR);
+            return;
+        }
+        
+        // 使用 Holder 来在任务链中传递临时文件路径
+        Holder<java.nio.file.Path> tempModpackHolder = new Holder<>();
+        
+        Task<?> installTask = Task.supplyAsync(() -> {
+            // 将整合包临时写入文件
+            java.nio.file.Path tempModpack = java.nio.file.Files.createTempFile("ourmc-lobby", ".zip");
+            java.nio.file.Files.copy(inputStream, tempModpack, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            tempModpackHolder.value = tempModpack;
+            return tempModpack;
+        })
+        .thenApplyAsync(tempModpack -> {
+            // 读取整合包清单
+            java.nio.charset.Charset encoding = CompressingUtils.findSuitableEncoding(tempModpack);
+            return ModpackHelper.readModpackManifest(tempModpack, encoding);
+        })
+        .thenComposeAsync(modpack -> {
+            // 获取安装任务并执行
+            return ModpackHelper.getInstallTask(profile, tempModpackHolder.value, modpackName, modpack, null);
+        })
+        .whenComplete(Schedulers.javafx(), (result, exception) -> {
+            // 删除临时文件
+            if (tempModpackHolder.value != null) {
+                try {
+                    java.nio.file.Files.deleteIfExists(tempModpackHolder.value);
+                } catch (IOException ignored) {
+                }
+            }
+            
+            if (exception == null) {
+                // 安装成功，刷新版本列表后启动游戏
+                profile.getRepository().refreshVersions();
+                LOG.warning("=== MainPage === Modpack installed successfully, launching with server: " + serverAddress);
+                Versions.launch(profile, modpackName, launcherHelper -> {
+                    LOG.warning("=== MainPage === Setting server address after installation: " + serverAddress);
+                    launcherHelper.setServerAddress(serverAddress);
+                });
+            } else {
+                LOG.warning("Failed to install modpack", exception);
+                Controllers.dialog(StringUtils.getStackTrace(exception),
+                        i18n("install.failed"),
+                        MessageDialogPane.MessageType.WARNING);
+            }
+        });
+        
+        // 显示安装进度对话框
+        Controllers.taskDialog(installTask, i18n("install.modpack"), TaskCancellationAction.NORMAL);
     }
 
     private void onUpgrade() {

@@ -202,6 +202,24 @@ public class RootPage extends DecoratorAnimatedPage implements DecoratorPage {
                 FXUtils.prepareOnMouseEnter(launcherSettingsItem, Controllers::prepareSettingsPage);
             }
 
+            // sixth item in left sidebar - 官网
+            AdvancedListItem websiteItem = new AdvancedListItem();
+            websiteItem.setLeftIcon(SVG.PUBLIC);
+            websiteItem.setTitle("官网");
+            websiteItem.setOnAction(e -> FXUtils.openLink("https://www.our-mc.cn"));
+
+            // seventh item in left sidebar - 皮肤站
+            AdvancedListItem skinSiteItem = new AdvancedListItem();
+            skinSiteItem.setLeftIcon(SVG.PERSON);
+            skinSiteItem.setTitle("皮肤站");
+            skinSiteItem.setOnAction(e -> FXUtils.openLink("https://skin.our-mc.cn"));
+
+            // eighth item in left sidebar - 广告位招租
+            AdvancedListItem adItem = new AdvancedListItem();
+            adItem.setLeftIcon(SVG.HOST);
+            adItem.setTitle("广告位招租");
+            adItem.setOnAction(e -> FXUtils.openLink("https://www.our-mc.cn"));
+
             // the left sidebar
             AdvancedListBox sideBar = new AdvancedListBox()
                     .startCategory(i18n("account").toUpperCase(Locale.ROOT))
@@ -211,7 +229,10 @@ public class RootPage extends DecoratorAnimatedPage implements DecoratorPage {
                     .add(gameItem)
                     .add(downloadItem)
                     .startCategory(i18n("settings.launcher.general").toUpperCase(Locale.ROOT))
-                    .add(launcherSettingsItem);
+                    .add(launcherSettingsItem)
+                    .add(websiteItem)
+                    .add(skinSiteItem)
+                    .add(adItem);
                     /*
                     .addNavigationDrawerItem(i18n("contact.chat"), SVG.CHAT, () -> {
                         Controllers.getSettingsPage().showFeedback();

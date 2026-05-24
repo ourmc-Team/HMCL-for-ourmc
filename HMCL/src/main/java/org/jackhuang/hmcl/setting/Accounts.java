@@ -71,7 +71,7 @@ public final class Accounts {
 
     public static final OAuthServer.Factory OAUTH_CALLBACK = new OAuthServer.Factory();
 
-    public static final AuthlibInjectorServer OURMC_SERVER = new AuthlibInjectorServer("https://skin.our-mc.cn/api/yggdrasil");
+    public static final AuthlibInjectorServer OURMC_SERVER = new AuthlibInjectorServer("https://skin.our-mc.cn/api/yggdrasil/");
     public static final BoundAuthlibInjectorAccountFactory FACTORY_OURMC = new BoundAuthlibInjectorAccountFactory(AUTHLIB_INJECTOR_DOWNLOADER, OURMC_SERVER);
     
     // Define other account factories
@@ -80,17 +80,16 @@ public final class Accounts {
     public static final MicrosoftAccountFactory FACTORY_MICROSOFT = new MicrosoftAccountFactory(MICROSOFT_SERVICE);
     public static final AuthlibInjectorAccountFactory FACTORY_AUTHLIB_INJECTOR = new AuthlibInjectorAccountFactory(AUTHLIB_INJECTOR_DOWNLOADER, url -> new AuthlibInjectorServer(url));
     
-    public static final List<AccountFactory<?>> FACTORIES = immutableListOf(FACTORY_OURMC, FACTORY_OFFLINE, FACTORY_MICROSOFT, FACTORY_AUTHLIB_INJECTOR);
+    // Only OurMC account factory is allowed for OurMC custom build
+    public static final List<AccountFactory<?>> FACTORIES = immutableListOf(FACTORY_OURMC);
 
     // ==== login type / account factory mapping ====
     private static final Map<String, AccountFactory<?>> type2factory = new HashMap<>();
     private static final Map<AccountFactory<?>, String> factory2type = new HashMap<>();
 
     static {
+        // Only OurMC account type is allowed for OurMC custom build
         type2factory.put("authlibInjector", FACTORY_OURMC);
-        type2factory.put("offline", FACTORY_OFFLINE);
-        type2factory.put("microsoft", FACTORY_MICROSOFT);
-        type2factory.put("authlib-injector", FACTORY_AUTHLIB_INJECTOR);
 
         type2factory.forEach((type, factory) -> factory2type.put(factory, type));
     }
@@ -117,10 +116,15 @@ public final class Accounts {
     // ====
 
     public static AccountFactory<?> getAccountFactory(Account account) {
-        if (account instanceof AuthlibInjectorAccount)
-            return FACTORY_OURMC;
-        else
-            throw new IllegalArgumentException("Failed to determine account type: " + account);
+        // Only AuthlibInjectorAccount is allowed for OurMC custom build
+        if (account instanceof AuthlibInjectorAccount) {
+            AuthlibInjectorAccount aiAccount = (AuthlibInjectorAccount) account;
+            // Only allow OurMC server accounts
+            if (OURMC_SERVER.equals(aiAccount.getServer())) {
+                return FACTORY_OURMC;
+            }
+        }
+        throw new IllegalArgumentException("Failed to determine account type: " + account);
     }
 
     private static final String GLOBAL_PREFIX = "$GLOBAL:";
@@ -179,14 +183,32 @@ public final class Accounts {
     }
 
     private static Account parseAccount(Map<Object, Object> storage) {
-        AccountFactory<?> factory = type2factory.get(storage.get("type"));
+        // Only OurMC accounts are allowed for OurMC custom build
+        String type = (String) storage.get("type");
+        if (!"authlibInjector".equals(type)) {
+            LOG.warning("Account type not allowed: " + type + ", skipping account: " + storage);
+            return null;
+        }
+
+        AccountFactory<?> factory = type2factory.get(type);
         if (factory == null) {
             LOG.warning("Unrecognized account type: " + storage);
             return null;
         }
 
         try {
-            return factory.fromStorage(storage);
+            Account account = factory.fromStorage(storage);
+            // Verify it's an OurMC server account
+            if (!(account instanceof AuthlibInjectorAccount)) {
+                LOG.warning("Account is not an AuthlibInjectorAccount: " + storage);
+                return null;
+            }
+            AuthlibInjectorAccount aiAccount = (AuthlibInjectorAccount) account;
+            if (!OURMC_SERVER.equals(aiAccount.getServer())) {
+                LOG.warning("Account server is not OurMC: " + aiAccount.getServer() + ", skipping account: " + storage);
+                return null;
+            }
+            return account;
         } catch (Exception e) {
             LOG.warning("Failed to load account: " + storage, e);
             return null;

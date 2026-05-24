@@ -439,9 +439,10 @@ public final class HMCLGameRepository extends DefaultGameRepository {
                 .setJavaAgents(javaAgents)
                 .setJavaArguments(javaArguments);
 
-        if (StringUtils.isNotBlank(vs.getServerIp())) {
-            builder.setQuickPlayOption(new QuickPlayOption.MultiPlayer(vs.getServerIp()));
-        }
+        // Only set quickPlayOption if serverIp is configured in version settings
+        // This allows callers to override with their own quickPlayOption
+        // Removed automatic server IP setting to allow callers to override
+        // Server address should be set via LauncherHelper injecter or version settings UI
 
         Path json = getModpackConfiguration(version);
         if (Files.exists(json)) {

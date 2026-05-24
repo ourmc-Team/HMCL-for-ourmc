@@ -357,7 +357,48 @@ public class DefaultLauncher extends Launcher {
 
         res.add(version.getMainClass());
 
+        // Log quick play option for debugging
+        if (options.getQuickPlayOption() == null) {
+            LOG.info("Quick play option is null - server auto-connect will not work");
+        } else {
+            LOG.info("Quick play option set: " + options.getQuickPlayOption().getClass().getSimpleName());
+        }
+
+        // Handle quick play options - prepare server arguments
+        List<String> quickPlayArgs = new ArrayList<>();
+        if (options.getQuickPlayOption() instanceof QuickPlayOption.MultiPlayer multiPlayer) {
+            String address = multiPlayer.serverIP();
+            LOG.info("Quick play multiplayer address: " + address);
+
+            try {
+                ServerAddress parsed = ServerAddress.parse(address);
+                String host = parsed.getHost();
+                int port = parsed.getPort() >= 0 ? parsed.getPort() : 25565;
+                // Always use --server and --port for better compatibility
+                // --quickPlayMultiplayer may cause issues with modded versions
+                quickPlayArgs.add("--server");
+                quickPlayArgs.add(host);
+                quickPlayArgs.add("--port");
+                quickPlayArgs.add(String.valueOf(port));
+                LOG.info("Added server arguments: --server " + host + " --port " + port);
+            } catch (IllegalArgumentException e) {
+                LOG.warning("Invalid server address: " + address, e);
+            }
+        } else if (options.getQuickPlayOption() instanceof QuickPlayOption.SinglePlayer singlePlayer
+                && World.supportQuickPlay(GameVersionNumber.asGameVersion(gameVersion))) {
+            quickPlayArgs.add("--quickPlaySingleplayer");
+            quickPlayArgs.add(singlePlayer.worldFolderName());
+        } else if (options.getQuickPlayOption() instanceof QuickPlayOption.Realm realm
+                && World.supportQuickPlay(GameVersionNumber.asGameVersion(gameVersion))) {
+            quickPlayArgs.add("--quickPlayRealms");
+            quickPlayArgs.add(realm.realmID());
+        }
+
+        // Add game arguments from version
         res.addAll(Arguments.parseStringArguments(version.getMinecraftArguments().map(StringUtils::tokenize).orElseGet(ArrayList::new), configuration));
+
+        // Add quick play arguments right after main game arguments for best compatibility
+        res.addAll(quickPlayArgs);
 
         Map<String, Boolean> features = getFeatures();
         version.getArguments().map(Arguments::getGame).ifPresent(arguments -> res.addAll(Arguments.parseArguments(arguments, configuration, features)));
@@ -366,33 +407,6 @@ public class DefaultLauncher extends Launcher {
         }
         if (argumentsFromAuthInfo != null && argumentsFromAuthInfo.getGame() != null && !argumentsFromAuthInfo.getGame().isEmpty())
             res.addAll(Arguments.parseArguments(argumentsFromAuthInfo.getGame(), configuration, features));
-
-        if (options.getQuickPlayOption() instanceof QuickPlayOption.MultiPlayer multiPlayer) {
-            String address = multiPlayer.serverIP();
-
-            try {
-                ServerAddress parsed = ServerAddress.parse(address);
-                if (World.supportQuickPlay(GameVersionNumber.asGameVersion(gameVersion))) {
-                    res.add("--quickPlayMultiplayer");
-                    res.add(parsed.getPort() >= 0 ? address : parsed.getHost() + ":25565");
-                } else {
-                    res.add("--server");
-                    res.add(parsed.getHost());
-                    res.add("--port");
-                    res.add(parsed.getPort() >= 0 ? String.valueOf(parsed.getPort()) : "25565");
-                }
-            } catch (IllegalArgumentException e) {
-                LOG.warning("Invalid server address: " + address, e);
-            }
-        } else if (options.getQuickPlayOption() instanceof QuickPlayOption.SinglePlayer singlePlayer
-                && World.supportQuickPlay(GameVersionNumber.asGameVersion(gameVersion))) {
-            res.add("--quickPlaySingleplayer");
-            res.add(singlePlayer.worldFolderName());
-        } else if (options.getQuickPlayOption() instanceof QuickPlayOption.Realm realm
-                && World.supportQuickPlay(GameVersionNumber.asGameVersion(gameVersion))) {
-            res.add("--quickPlayRealms");
-            res.add(realm.realmID());
-        }
 
         if (options.isFullscreen())
             res.add("--fullscreen");

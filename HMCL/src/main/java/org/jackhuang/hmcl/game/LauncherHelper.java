@@ -118,6 +118,25 @@ public final class LauncherHelper {
 
     public void setQuickPlayOption(QuickPlayOption quickPlayOption) {
         this.quickPlayOption = quickPlayOption;
+        LOG.warning("=== LauncherHelper === setQuickPlayOption called: " + 
+            (quickPlayOption != null ? quickPlayOption.getClass().getSimpleName() : "null"));
+        if (quickPlayOption instanceof QuickPlayOption.MultiPlayer mp) {
+            LOG.warning("=== LauncherHelper === Server address set to: " + mp.serverIP());
+        }
+    }
+    
+    /**
+     * Set server address for quick play (multiplayer auto-connect)
+     * This method provides a more explicit way to set server address
+     */
+    public void setServerAddress(String serverAddress) {
+        if (serverAddress == null || serverAddress.trim().isEmpty()) {
+            LOG.warning("=== LauncherHelper === setServerAddress called with null or empty address");
+            this.quickPlayOption = null;
+            return;
+        }
+        this.quickPlayOption = new QuickPlayOption.MultiPlayer(serverAddress);
+        LOG.warning("=== LauncherHelper === Server address explicitly set to: " + serverAddress);
     }
 
     public void setDisableOfflineSkin() {
@@ -228,8 +247,16 @@ public final class LauncherHelper {
                     if (disableOfflineSkin) {
                         launchOptionsBuilder.setDaemon(false);
                     }
+                    // Always override quickPlayOption if set via injecter
+                    // This ensures our "进入大厅" server address is always used
                     if (quickPlayOption != null) {
+                        LOG.info("LauncherHelper: quickPlayOption is set - " + quickPlayOption.getClass().getSimpleName());
+                        if (quickPlayOption instanceof QuickPlayOption.MultiPlayer mp) {
+                            LOG.info("LauncherHelper: MultiPlayer server address: " + mp.serverIP());
+                        }
                         launchOptionsBuilder.setQuickPlayOption(quickPlayOption);
+                    } else {
+                        LOG.info("LauncherHelper: quickPlayOption is null - server auto-connect will not work");
                     }
 
                     LaunchOptions launchOptions = launchOptionsBuilder.create();
